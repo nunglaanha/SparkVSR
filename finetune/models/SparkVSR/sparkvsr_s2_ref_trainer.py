@@ -384,14 +384,6 @@ class KFVSRS2RefTrainer(Trainer):
 
         latent_pred_scaled = 1 / self.components.vae.config.scaling_factor * latent_pred
         
-        decoded_frames = []
-        for i in range(latent_pred_scaled.shape[2]):
-             latent_frame = latent_pred_scaled[:, :, i:i+1, :, :]
-             frame_decoded = self.components.vae.decode(latent_frame).sample
-             decoded_frames.append(frame_decoded)
-        video_generate = torch.cat(decoded_frames, dim=2)
-        video_generate = (video_generate * 0.5 + 0.5).clamp(0.0, 1.0)
-        
         if 'hq_pixels' not in locals():
              # Decode HQ Latent
              hq_latent_scaled = 1 / self.components.vae.config.scaling_factor * hq_latent
@@ -409,7 +401,9 @@ class KFVSRS2RefTrainer(Trainer):
         # Normalize hq_pixels to [0,1]
         hq_pixels_norm = (hq_pixels * 0.5 + 0.5).clamp(0.0, 1.0)
         
-        # Decode Latent (Whole Batch)
+        # Decode the complete temporal latent sequence once. Decoding each latent
+        # frame first would retain an unused VAE autograd graph and inflate the
+        # Stage-2 peak memory before this full-sequence decode.
         video_generate = self.components.vae.decode(latent_pred_scaled).sample
         video_generate = (video_generate * 0.5 + 0.5).clamp(0.0, 1.0)
         
